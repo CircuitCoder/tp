@@ -10,6 +10,7 @@ use db_key::Key;
 use rand::{self, Rng};
 use rand::distributions::Alphanumeric;
 
+#[derive(Clone)]
 struct DBKey(String);
 
 impl Key for DBKey {
@@ -82,14 +83,32 @@ fn create(mut payload: Json<Payload>) -> impl Responder {
     HttpResponse::Created().json(resp)
 }
 
-/*
-fn edit(path: Path<(String, )>) -> impl Responder {
+fn edit(path: Path<(String, )>, payload: Json<Payload>) -> impl Responder {
+    let guard = db.lock().unwrap();
+
+    let dbkey = DBKey(path.0.clone());
+
+    let original: Payload = match guard.get(ReadOptions::new(), dbkey.clone()).unwrap() {
+        Some(cont) => {
+            serde_json::from_slice(&cont).unwrap()
+        },
+        None => return HttpResponse::NotFound().finish(),
+    };
+
+    if original.key != payload.key && 
+        (MASTER_KEY.is_none() || *MASTER_KEY != payload.key) {
+            return HttpResponse::Forbidden().finish();
+        }
+
+    guard.put(WriteOptions::new(), dbkey, &serde_json::to_vec(&*payload).unwrap());
+
+    HttpResponse::Created().finish()
 }
-*/
 
 fn main() {
     let server = server::new(|| App::new()
                 .route("/edit", http::Method::POST, create)
+                .route("/edit/{id}", http::Method::PUT, edit)
                 .resource("/{id}", |r| r.with(redirect)));
     let bind = server.bind("127.0.0.1:7103").unwrap();
     bind.run();
