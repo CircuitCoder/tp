@@ -25,7 +25,7 @@ impl Key for DBKey {
 
 lazy_static! {
     static ref MASTER_KEY: Option<String> = std::env::var("MASTER_KEY").ok();
-    static ref db: Arc<Mutex<Database<DBKey>>> = {
+    static ref DB: Arc<Mutex<Database<DBKey>>> = {
         let mut opts = Options::new();
         opts.create_if_missing = true;
         let inner = Database::open(std::path::Path::new("./db"), opts).unwrap();
@@ -46,7 +46,7 @@ struct Resp {
 }
 
 fn redirect(path: Path<(String, )>) -> impl Responder {
-    let guard = db.lock().unwrap();
+    let guard = DB.lock().unwrap();
 
     match guard.get(ReadOptions::new(), DBKey(path.0.clone())).unwrap() {
         Some(cont) => {
@@ -77,14 +77,14 @@ fn create(mut payload: Json<Payload>) -> impl Responder {
 
     payload.key = Some(resp.key.clone());
 
-    let guard = db.lock().unwrap();
-    guard.put(WriteOptions::new(), dbkey, &serde_json::to_vec(&*payload).unwrap());
+    let guard = DB.lock().unwrap();
+    guard.put(WriteOptions::new(), dbkey, &serde_json::to_vec(&*payload).unwrap()).unwrap();
 
     HttpResponse::Created().json(resp)
 }
 
 fn edit(path: Path<(String, )>, mut payload: Json<Payload>) -> impl Responder {
-    let guard = db.lock().unwrap();
+    let guard = DB.lock().unwrap();
 
     let dbkey = DBKey(path.0.clone());
 
@@ -102,7 +102,7 @@ fn edit(path: Path<(String, )>, mut payload: Json<Payload>) -> impl Responder {
 
     payload.key = original.key;
 
-    guard.put(WriteOptions::new(), dbkey, &serde_json::to_vec(&*payload).unwrap());
+    guard.put(WriteOptions::new(), dbkey, &serde_json::to_vec(&*payload).unwrap()).unwrap();
 
     HttpResponse::Created().finish()
 }
