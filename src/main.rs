@@ -83,7 +83,7 @@ fn create(mut payload: Json<Payload>) -> impl Responder {
     HttpResponse::Created().json(resp)
 }
 
-fn edit(path: Path<(String, )>, payload: Json<Payload>) -> impl Responder {
+fn edit(path: Path<(String, )>, mut payload: Json<Payload>) -> impl Responder {
     let guard = db.lock().unwrap();
 
     let dbkey = DBKey(path.0.clone());
@@ -99,6 +99,8 @@ fn edit(path: Path<(String, )>, payload: Json<Payload>) -> impl Responder {
         (MASTER_KEY.is_none() || *MASTER_KEY != payload.key) {
             return HttpResponse::Forbidden().finish();
         }
+
+    payload.key = original.key;
 
     guard.put(WriteOptions::new(), dbkey, &serde_json::to_vec(&*payload).unwrap());
 
